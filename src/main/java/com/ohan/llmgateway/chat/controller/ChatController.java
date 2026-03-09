@@ -16,6 +16,7 @@ import com.ohan.llmgateway.provider.dto.LlmResponse;
 import com.ohan.llmgateway.router.ModelRouter;
 import com.ohan.llmgateway.usage.service.UsageService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,6 +27,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/v1/chat")
 @RequiredArgsConstructor
+@Slf4j
 public class ChatController {
 
     private final ModelRouter modelRouter;
@@ -37,7 +39,7 @@ public class ChatController {
     ) {
 
         String prompt = buildPrompt(request);
-
+        log.info("ChatController:chatCompletion");
         LlmResponse response = modelRouter.route(
                 request.getModel(),
                 prompt

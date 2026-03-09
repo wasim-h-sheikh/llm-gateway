@@ -7,13 +7,13 @@
  */
 package com.ohan.llmgateway;
 
-import com.ohan.llmgateway.provider.openai.OpenAiConfig;
+import com.ohan.llmgateway.provider.ProvidersConfig;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
 @SpringBootApplication
-@EnableConfigurationProperties(OpenAiConfig.class)
+@ConfigurationPropertiesScan
 public class LlmGatewayApplication {
 
 	public static void main(String[] args) {

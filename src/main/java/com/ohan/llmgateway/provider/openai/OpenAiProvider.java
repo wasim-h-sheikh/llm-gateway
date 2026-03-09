@@ -10,6 +10,8 @@
 
 package com.ohan.llmgateway.provider.openai;
 
+import com.ohan.llmgateway.provider.ProviderProperties;
+import com.ohan.llmgateway.provider.ProvidersConfig;
 import com.ohan.llmgateway.provider.LlmProvider;
 import com.ohan.llmgateway.provider.dto.LlmResponse;
 import com.ohan.llmgateway.provider.openai.dto.OpenAiChatRequest;
@@ -30,12 +32,18 @@ import java.util.List;
 @Slf4j
 public class OpenAiProvider implements LlmProvider {
 
-    private final OpenAiConfig config;
+    private final ProvidersConfig providersConfig;
 
     private final RestClient restClient = RestClient.builder().build();
 
     @Override
     public LlmResponse generate(String model, String prompt) {
+
+        ProviderProperties config = providersConfig.getConfigs().get("openai");
+        log.info("Provider config map: {}", providersConfig.getConfigs());
+        if (config == null || !config.isEnabled()) {
+            throw new RuntimeException("OpenAI provider disabled");
+        }
 
         try {
 
@@ -48,7 +56,8 @@ public class OpenAiProvider implements LlmProvider {
                                     .build()
                     ))
                     .build();
-
+            log.info("OpenAI base URL: {}", config.getBaseUrl());
+            log.info("OpenAI key present: {}", config.getApiKey() != null);
             OpenAiChatResponse response = restClient.post()
                     .uri(config.getBaseUrl() + "/chat/completions")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + config.getApiKey())
@@ -57,17 +66,13 @@ public class OpenAiProvider implements LlmProvider {
                     .retrieve()
                     .body(OpenAiChatResponse.class);
 
-            if (response == null || response.getChoices() == null || response.getChoices().isEmpty()) {
-                throw new RuntimeException("OpenAI returned empty response");
-            }
-
             String content = response.getChoices()
                     .get(0)
                     .getMessage()
                     .getContent();
 
-            int inputTokens = response.getUsage() != null ? response.getUsage().getPrompt_tokens() : 0;
-            int outputTokens = response.getUsage() != null ? response.getUsage().getCompletion_tokens() : 0;
+            int inputTokens = response.getUsage().getPrompt_tokens();
+            int outputTokens = response.getUsage().getCompletion_tokens();
 
             return LlmResponse.builder()
                     .content(content)
