@@ -40,7 +40,6 @@ public class OpenAiProvider implements LlmProvider {
     public LlmResponse generate(String model, String prompt) {
 
         ProviderProperties config = providersConfig.getConfigs().get("openai");
-        log.info("Provider config map: {}", providersConfig.getConfigs());
         if (config == null || !config.isEnabled()) {
             throw new RuntimeException("OpenAI provider disabled");
         }
@@ -56,8 +55,7 @@ public class OpenAiProvider implements LlmProvider {
                                     .build()
                     ))
                     .build();
-            log.info("OpenAI base URL: {}", config.getBaseUrl());
-            log.info("OpenAI key present: {}", config.getApiKey() != null);
+
             OpenAiChatResponse response = restClient.post()
                     .uri(config.getBaseUrl() + "/chat/completions")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + config.getApiKey())
