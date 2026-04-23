@@ -28,6 +28,15 @@ providers:
       base-url: "https://api.openai.com/v1"
       enabled: true
 
+resilience4j:
+  circuitbreaker:
+    instances:
+      openai:
+        failureRateThreshold: 50
+        minimumNumberOfCalls: 5
+        slidingWindowSize: 10
+        waitDurationInOpenState: 10s
+
 logging:
   level:
     org.springframework.security: INFO
