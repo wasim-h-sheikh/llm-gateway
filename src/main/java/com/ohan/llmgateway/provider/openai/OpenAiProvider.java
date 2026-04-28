@@ -17,8 +17,6 @@ import com.ohan.llmgateway.provider.dto.LlmResponse;
 import com.ohan.llmgateway.provider.openai.dto.OpenAiChatRequest;
 import com.ohan.llmgateway.provider.openai.dto.OpenAiChatResponse;
 
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -39,7 +37,6 @@ public class OpenAiProvider implements LlmProvider {
     private final RestClient restClient = RestClient.builder().build();
 
     @Override
-    @CircuitBreaker(name = "openai", fallbackMethod = "fallback")
     public LlmResponse generate(String model, String prompt) {
 
         ProviderProperties config = providersConfig.getConfigs().get("openai");
