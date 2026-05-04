@@ -14,6 +14,7 @@ import com.ohan.llmgateway.auth.jwt.JwtService;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -21,6 +22,7 @@ import java.io.IOException;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private final RateLimitService rateLimitService;
@@ -44,34 +46,38 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         String authHeader = request.getHeader("Authorization");
 
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
-            String token = authHeader.substring(7);
 
-            // API key case
-            if (token.startsWith("sk_")) {
+        String token = authHeader.substring(7);
+        log.info("Auth token received: {}", token.substring(0, Math.min(10, token.length())));
 
-                String prefix = token.substring(0, 12);
+        // API key case
+        if (token.startsWith("sk_")) {
 
-                if (!rateLimitService.isApiKeyAllowed(prefix)) {
-                    response.setStatus(429);
-                    response.getWriter().write("API key rate limit exceeded");
-                    return;
-                }
+            String prefix = token.substring(0, 12);
+
+            if (!rateLimitService.isApiKeyAllowed(prefix)) {
+                response.setStatus(429);
+                response.getWriter().write("API key rate limit exceeded");
+                return;
             }
+        }
 
-            // JWT case
-            else {
+        // JWT case
+        else {
 
-                Long userId = jwtService.extractUserId(token);
+            Long userId = jwtService.extractUserId(token);
 
-                String redisKey = "rate_limit:user:" + userId;
+            String redisKey = "rate_limit:user:" + userId;
 
-                if (!rateLimitService.isAllowed(redisKey, 60)) {
-                    response.setStatus(429);
-                    response.getWriter().write("User rate limit exceeded");
-                    return;
-                }
+            if (!rateLimitService.isAllowed(redisKey, 60)) {
+                response.setStatus(429);
+                response.getWriter().write("User rate limit exceeded");
+                return;
             }
         }
 

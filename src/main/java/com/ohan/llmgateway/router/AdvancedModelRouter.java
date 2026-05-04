@@ -62,8 +62,14 @@ public class AdvancedModelRouter {
 
     private List<String> resolveProviders(String model) {
 
+        // 🔥 NVIDIA models (your 20 models)
+
+        if (model.contains("/")) {
+            return List.of("nvidiaProvider");
+        }
+
         if (model.startsWith("gpt")) {
-            return List.of("openAiProvider"); // later add fallback chain
+            return List.of("openAiProvider");
         }
 
         return List.of("openAiProvider");

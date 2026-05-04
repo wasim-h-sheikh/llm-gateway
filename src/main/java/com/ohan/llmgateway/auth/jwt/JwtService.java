@@ -54,6 +54,10 @@ public class JwtService {
 
     public Long extractUserId(String token) {
 
+        if (token == null || token.startsWith("sk_")) {
+            throw new RuntimeException("Invalid JWT token");
+        }
+
         Claims claims = Jwts.parser()
                 .verifyWith(getSignKey())
                 .build()
