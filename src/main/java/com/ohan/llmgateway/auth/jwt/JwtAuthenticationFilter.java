@@ -10,10 +10,16 @@
 
 package com.ohan.llmgateway.auth.jwt;
 
+import com.ohan.llmgateway.common.error.ErrorCode;
+import com.ohan.llmgateway.security.AuthTokenResolver;
+import com.ohan.llmgateway.security.AuthTokenType;
+import com.ohan.llmgateway.security.SecurityErrorResponseWriter;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -30,6 +36,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
+    private final AuthTokenResolver authTokenResolver;
+    private final SecurityErrorResponseWriter securityErrorResponseWriter;
 
     @Override
     protected void doFilterInternal(
@@ -49,12 +57,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         log.info("Auth token received: {}", token.substring(0, Math.min(10, token.length())));
 
         // Skip API keys
-        if (token.startsWith("sk_")) {
+        AuthTokenType tokenType = authTokenResolver.resolve(token);
+
+        if (tokenType != AuthTokenType.JWT) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        String username = jwtService.extractUsername(token);
+        String username;
+        try {
+
+            username = jwtService.extractUsername(token);
+
+        } catch (JwtException e) {
+
+            securityErrorResponseWriter.write(
+                    response,
+                    HttpStatus.UNAUTHORIZED,
+                    ErrorCode.INVALID_JWT,
+                    "Invalid JWT token"
+            );
+
+            return;
+        }
 
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 

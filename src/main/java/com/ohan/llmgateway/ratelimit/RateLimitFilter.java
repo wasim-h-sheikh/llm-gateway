@@ -11,10 +11,15 @@
 package com.ohan.llmgateway.ratelimit;
 
 import com.ohan.llmgateway.auth.jwt.JwtService;
+import com.ohan.llmgateway.common.error.ErrorCode;
+import com.ohan.llmgateway.security.AuthTokenResolver;
+import com.ohan.llmgateway.security.AuthTokenType;
+import com.ohan.llmgateway.security.SecurityErrorResponseWriter;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -27,6 +32,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private final RateLimitService rateLimitService;
     private final JwtService jwtService;
+    private final AuthTokenResolver authTokenResolver;
+    private final SecurityErrorResponseWriter securityErrorResponseWriter;
 
     @Override
     protected void doFilterInternal(
@@ -39,8 +46,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         // IP rate limit
         if (!rateLimitService.isIpAllowed(clientIp)) {
-            response.setStatus(429);
-            response.getWriter().write("IP rate limit exceeded");
+            securityErrorResponseWriter.write(
+                    response,
+                    HttpStatus.TOO_MANY_REQUESTS,
+                    ErrorCode.IP_RATE_LIMIT_EXCEEDED,
+                    "IP rate limit exceeded"
+            );
             return;
         }
 
@@ -54,31 +65,45 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         String token = authHeader.substring(7);
         log.info("Auth token received: {}", token.substring(0, Math.min(10, token.length())));
+        AuthTokenType tokenType = authTokenResolver.resolve(token);
 
         // API key case
-        if (token.startsWith("sk_")) {
+        if (tokenType == AuthTokenType.API_KEY) {
 
             String prefix = token.substring(0, 12);
 
             if (!rateLimitService.isApiKeyAllowed(prefix)) {
-                response.setStatus(429);
-                response.getWriter().write("API key rate limit exceeded");
+                securityErrorResponseWriter.write(
+                        response,
+                        HttpStatus.TOO_MANY_REQUESTS,
+                        ErrorCode.RATE_LIMIT_EXCEEDED,
+                        "API key rate limit exceeded"
+                );
                 return;
             }
-        }
-
-        // JWT case
-        else {
+        } else if(tokenType == AuthTokenType.JWT) {
 
             Long userId = jwtService.extractUserId(token);
 
             String redisKey = "rate_limit:user:" + userId;
 
             if (!rateLimitService.isAllowed(redisKey, 60)) {
-                response.setStatus(429);
-                response.getWriter().write("User rate limit exceeded");
+                securityErrorResponseWriter.write(
+                        response,
+                        HttpStatus.TOO_MANY_REQUESTS,
+                        ErrorCode.RATE_LIMIT_EXCEEDED,
+                        "User rate limit exceeded"
+                );
                 return;
             }
+        } else {
+            securityErrorResponseWriter.write(
+                    response,
+                    HttpStatus.UNAUTHORIZED,
+                    ErrorCode.UNAUTHORIZED_ACCESS,
+                    "unauthorized access"
+            );
+            return;
         }
 
         filterChain.doFilter(request, response);

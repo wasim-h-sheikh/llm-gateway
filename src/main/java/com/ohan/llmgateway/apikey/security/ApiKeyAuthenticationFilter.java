@@ -11,6 +11,8 @@
 package com.ohan.llmgateway.apikey.security;
 
 import com.ohan.llmgateway.apikey.repository.ApiKeyRepository;
+import com.ohan.llmgateway.security.AuthTokenResolver;
+import com.ohan.llmgateway.security.AuthTokenType;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 
     private final ApiKeyRepository apiKeyRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuthTokenResolver authTokenResolver;
 
     @Override
     protected void doFilterInternal(
@@ -46,7 +49,12 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
         if (authHeader != null && authHeader.startsWith("Bearer sk_")) {
 
             String apiKey = authHeader.substring(7);
+            AuthTokenType tokenType = authTokenResolver.resolve(apiKey);
 
+            if (tokenType != AuthTokenType.API_KEY) {
+                filterChain.doFilter(request, response);
+                return;
+            }
             String prefix = apiKey.substring(0, 12);
 
             apiKeyRepository.findByKeyPrefix(prefix).ifPresent(storedKey -> {
