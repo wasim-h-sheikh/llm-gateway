@@ -13,7 +13,7 @@ package com.ohan.llmgateway.chat.controller;
 import com.ohan.llmgateway.chat.dto.ChatCompletionRequest;
 import com.ohan.llmgateway.chat.dto.ChatCompletionResponse;
 import com.ohan.llmgateway.provider.dto.LlmResponse;
-import com.ohan.llmgateway.router.ModelRouter;
+import com.ohan.llmgateway.router.AdvancedModelRouter;
 import com.ohan.llmgateway.usage.service.UsageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,7 +30,7 @@ import java.util.UUID;
 @Slf4j
 public class ChatController {
 
-    private final ModelRouter modelRouter;
+    private final AdvancedModelRouter modelRouter;
     private final UsageService usageService;
 
     @PostMapping("/completions")
