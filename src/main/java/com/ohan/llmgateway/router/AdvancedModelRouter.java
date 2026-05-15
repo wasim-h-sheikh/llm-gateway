@@ -13,6 +13,9 @@
 
 package com.ohan.llmgateway.router;
 
+import com.ohan.llmgateway.model.entity.ModelMetadata;
+import com.ohan.llmgateway.model.enums.ProviderType;
+import com.ohan.llmgateway.model.service.ModelMetadataService;
 import com.ohan.llmgateway.provider.LlmProvider;
 import com.ohan.llmgateway.provider.dto.LlmResponse;
 import com.ohan.llmgateway.provider.registry.ProviderRegistry;
@@ -23,8 +26,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -32,46 +33,63 @@ public class AdvancedModelRouter {
 
     private final ProviderRegistry providerRegistry;
     private final ResilientProviderExecutor executor;
+    private final ModelMetadataService modelMetadataService;
 
     public LlmResponse route(String model, String prompt) {
 
-        List<String> providers = resolveProviders(model);
+        ModelMetadata metadata =
+                modelMetadataService.getByModelName(model);
 
-        Exception lastException = null;
-
-        for (String providerName : providers) {
-            try {
-
-                LlmProvider provider = providerRegistry.getProvider(providerName);
-
-                return executor.execute(
-                        providerName,
-                        provider,
-                        model,
-                        prompt
-                );
-
-            } catch (Exception e) {
-                log.error("Provider failed: {}", providerName, e);
-                lastException = e;
-            }
+        if (!Boolean.TRUE.equals(metadata.getEnabled())) {
+            throw new RuntimeException(
+                    "Model is disabled: " + model
+            );
         }
 
-        throw new RuntimeException("All providers failed", lastException);
+        String providerBeanName =
+                resolveProviderBeanName(metadata.getProvider());
+
+        try {
+
+            LlmProvider provider =
+                    providerRegistry.getProvider(providerBeanName);
+
+            return executor.execute(
+                    providerBeanName,
+                    provider,
+                    model,
+                    prompt
+            );
+
+        } catch (Exception e) {
+
+            log.error(
+                    "Provider failed for model: {} provider: {}",
+                    model,
+                    providerBeanName,
+                    e
+            );
+
+            throw new RuntimeException(
+                    "Provider execution failed",
+                    e
+            );
+        }
     }
 
-    private List<String> resolveProviders(String model) {
+    private String resolveProviderBeanName(
+            ProviderType providerType
+    ) {
 
-        // 🔥 NVIDIA models (your 20 models)
+        return switch (providerType) {
 
-        if (model.contains("/")) {
-            return List.of("nvidiaProvider");
-        }
+            case OPENAI -> "openAiProvider";
 
-        if (model.startsWith("gpt")) {
-            return List.of("openAiProvider");
-        }
+            case NVIDIA -> "nvidiaProvider";
 
-        return List.of("openAiProvider");
+            default -> throw new RuntimeException(
+                    "Unsupported provider: " + providerType
+            );
+        };
     }
 }
