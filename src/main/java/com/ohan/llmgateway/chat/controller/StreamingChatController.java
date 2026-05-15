@@ -12,6 +12,7 @@ package com.ohan.llmgateway.chat.controller;
 
 import com.ohan.llmgateway.chat.dto.ChatCompletionRequest;
 import com.ohan.llmgateway.provider.dto.LlmResponse;
+import com.ohan.llmgateway.router.AdvancedModelRouter;
 import com.ohan.llmgateway.router.ModelRouter;
 import com.ohan.llmgateway.usage.service.UsageService;
 
@@ -29,7 +30,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class StreamingChatController {
 
-    private final ModelRouter modelRouter;
+    private final AdvancedModelRouter modelRouter;
     private final UsageService usageService;
 
     @PostMapping(value = "/completions/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

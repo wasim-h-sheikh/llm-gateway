@@ -28,13 +28,14 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class AdvancedModelRouter {
+public class AdvancedModelRouter implements ModelRouter{
 
     private final ProviderRegistry providerRegistry;
     private final ResilientProviderExecutor executor;
     private final ModelMetadataService modelMetadataService;
 
-    public LlmResponse route(
+    @Override
+    public  LlmResponse route(
             String model,
             String prompt
     ) {
