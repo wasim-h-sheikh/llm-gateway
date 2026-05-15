@@ -14,7 +14,6 @@
 package com.ohan.llmgateway.router;
 
 import com.ohan.llmgateway.model.entity.ModelMetadata;
-import com.ohan.llmgateway.model.enums.ProviderType;
 import com.ohan.llmgateway.model.service.ModelMetadataService;
 import com.ohan.llmgateway.provider.LlmProvider;
 import com.ohan.llmgateway.provider.dto.LlmResponse;
@@ -35,24 +34,25 @@ public class AdvancedModelRouter {
     private final ResilientProviderExecutor executor;
     private final ModelMetadataService modelMetadataService;
 
-    public LlmResponse route(String model, String prompt) {
+    public LlmResponse route(
+            String model,
+            String prompt
+    ) {
 
         ModelMetadata metadata =
                 modelMetadataService.getByModelName(model);
 
-        if (!Boolean.TRUE.equals(metadata.getEnabled())) {
-            throw new RuntimeException(
-                    "Model is disabled: " + model
-            );
-        }
+        validateModel(metadata);
 
         String providerBeanName =
-                resolveProviderBeanName(metadata.getProvider());
+                metadata.getProviderBeanName();
 
         try {
 
             LlmProvider provider =
-                    providerRegistry.getProvider(providerBeanName);
+                    providerRegistry.getProvider(
+                            providerBeanName
+                    );
 
             return executor.execute(
                     providerBeanName,
@@ -64,7 +64,7 @@ public class AdvancedModelRouter {
         } catch (Exception e) {
 
             log.error(
-                    "Provider failed for model: {} provider: {}",
+                    "Provider execution failed. model={} provider={}",
                     model,
                     providerBeanName,
                     e
@@ -77,19 +77,21 @@ public class AdvancedModelRouter {
         }
     }
 
-    private String resolveProviderBeanName(
-            ProviderType providerType
+    private void validateModel(
+            ModelMetadata metadata
     ) {
 
-        return switch (providerType) {
-
-            case OPENAI -> "openAiProvider";
-
-            case NVIDIA -> "nvidiaProvider";
-
-            default -> throw new RuntimeException(
-                    "Unsupported provider: " + providerType
+        if (metadata == null) {
+            throw new RuntimeException(
+                    "Model metadata not found"
             );
-        };
+        }
+
+        if (!Boolean.TRUE.equals(metadata.getEnabled())) {
+            throw new RuntimeException(
+                    "Model is disabled: "
+                            + metadata.getModelName()
+            );
+        }
     }
 }
