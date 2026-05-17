@@ -8,10 +8,11 @@
  *
  */
 
-package com.ohan.llmgateway.router;
+package com.ohan.llmgateway.routing.enums;
 
-import com.ohan.llmgateway.provider.dto.LlmResponse;
-
-public interface ModelRouter {
-    LlmResponse route(String model, String prompt);
+public enum RequestType {
+    CHAT,
+    CODING,
+    REASONING,
+    VISION
 }

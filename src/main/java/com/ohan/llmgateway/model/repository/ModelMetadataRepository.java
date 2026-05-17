@@ -27,4 +27,10 @@ public interface ModelMetadataRepository
     List<ModelMetadata> findByProviderAndEnabledTrue(
             ProviderType provider
     );
+
+    List<ModelMetadata>
+    findByEnabledTrueOrderByAvgLatencyMsAsc();
+
+    List<ModelMetadata>
+    findByEnabledTrueOrderByInputCostPer1kAsc();
 }
