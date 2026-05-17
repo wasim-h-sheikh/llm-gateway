@@ -12,6 +12,7 @@ package com.ohan.llmgateway.chat.controller;
 
 import com.ohan.llmgateway.chat.dto.ChatCompletionRequest;
 import com.ohan.llmgateway.chat.dto.ChatCompletionResponse;
+import com.ohan.llmgateway.execution.service.LlmExecutionService;
 import com.ohan.llmgateway.provider.dto.LlmResponse;
 import com.ohan.llmgateway.router.AdvancedModelRouter;
 import com.ohan.llmgateway.usage.service.UsageService;
@@ -30,7 +31,7 @@ import java.util.UUID;
 @Slf4j
 public class ChatController {
 
-    private final AdvancedModelRouter modelRouter;
+    private final LlmExecutionService llmExecutionService;
     private final UsageService usageService;
 
     @PostMapping("/completions")
@@ -40,7 +41,7 @@ public class ChatController {
 
         String prompt = buildPrompt(request);
         log.info("ChatController:chatCompletion");
-        LlmResponse response = modelRouter.route(
+        LlmResponse response = llmExecutionService.execute(
                 request.getModel(),
                 prompt
         );

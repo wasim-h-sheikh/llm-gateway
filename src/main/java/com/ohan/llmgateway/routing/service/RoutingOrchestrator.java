@@ -10,6 +10,7 @@
 
 package com.ohan.llmgateway.routing.service;
 
+import com.ohan.llmgateway.execution.service.LlmExecutionService;
 import com.ohan.llmgateway.provider.dto.LlmResponse;
 import com.ohan.llmgateway.router.AdvancedModelRouter;
 import com.ohan.llmgateway.routing.dto.RoutingDecision;
@@ -33,7 +34,7 @@ public class RoutingOrchestrator {
 
     private final CapabilityRouter capabilityRouter;
 
-    private final AdvancedModelRouter advancedModelRouter;
+    private final LlmExecutionService llmExecutionService;
 
     public LlmResponse route(
             RoutingRequest request,
@@ -43,7 +44,7 @@ public class RoutingOrchestrator {
         RoutingDecision decision =
                 resolveDecision(request);
 
-        return advancedModelRouter.route(
+        return llmExecutionService.execute(
                 decision.getSelectedModel(),
                 prompt
         );

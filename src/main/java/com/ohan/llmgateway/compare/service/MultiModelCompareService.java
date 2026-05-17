@@ -13,6 +13,7 @@ package com.ohan.llmgateway.compare.service;
 import com.ohan.llmgateway.compare.dto.CompareRequest;
 import com.ohan.llmgateway.compare.dto.CompareResponse;
 import com.ohan.llmgateway.compare.dto.ModelComparisonResult;
+import com.ohan.llmgateway.execution.service.LlmExecutionService;
 import com.ohan.llmgateway.model.entity.ModelMetadata;
 import com.ohan.llmgateway.model.service.ModelMetadataService;
 import com.ohan.llmgateway.provider.dto.LlmResponse;
@@ -31,7 +32,7 @@ import java.util.concurrent.CompletableFuture;
 @Slf4j
 public class MultiModelCompareService {
 
-    private final AdvancedModelRouter router;
+    private final LlmExecutionService llmExecutionService;
     private final ModelMetadataService modelMetadataService;
 
     public CompareResponse compare(
@@ -76,7 +77,7 @@ public class MultiModelCompareService {
                     modelMetadataService.getByModelName(model);
 
             LlmResponse response =
-                    router.route(model, prompt);
+                    llmExecutionService.execute(model, prompt);
 
             long latency =
                     System.currentTimeMillis() - start;
