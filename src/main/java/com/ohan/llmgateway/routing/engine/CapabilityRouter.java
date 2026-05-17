@@ -46,8 +46,8 @@ public class CapabilityRouter {
                                         .contains(capability)
                         )
                         .min(
-                                Comparator.comparing(
-                                        ModelMetadata::getAvgLatencyMs
+                                Comparator.comparingDouble(
+                                        this::calculateScore
                                 )
                         )
                         .orElseThrow(() ->
@@ -65,9 +65,44 @@ public class CapabilityRouter {
                         selected.getProvider().name()
                 )
                 .reason(
-                        "Capability optimized routing"
+                        buildReason(
+                                selected,
+                                capability
+                        )
                 )
                 .build();
+    }
+
+    /**
+     * Lower score is better
+     */
+    private double calculateScore(
+            ModelMetadata model
+    ) {
+
+        double latency =
+                safeInt(model.getAvgLatencyMs());
+
+        double healthBonus =
+                safeDouble(
+                        model.getHealthScore()
+                ) * 5;
+
+        return latency - healthBonus;
+    }
+
+    private String buildReason(
+            ModelMetadata model,
+            ModelCapability capability
+    ) {
+
+        return String.format(
+                "Capability routing " +
+                        "(capability=%s latency=%sms health=%.2f)",
+                capability,
+                model.getAvgLatencyMs(),
+                model.getHealthScore()
+        );
     }
 
     private ModelCapability mapRequestType(
@@ -88,5 +123,13 @@ public class CapabilityRouter {
             default ->
                     ModelCapability.CHAT;
         };
+    }
+
+    private int safeInt(Integer value) {
+        return value == null ? 999999 : value;
+    }
+
+    private double safeDouble(Double value) {
+        return value == null ? 0 : value;
     }
 }

@@ -80,6 +80,16 @@ public class ModelMetadata {
 
     private Instant updatedAt;
 
+    private Long totalRequests = 0L;
+
+    private Long successfulRequests = 0L;
+
+    private Long failedRequests = 0L;
+
+    private Double averageResponseTimeMs = 0.0;
+
+    private Long timeoutCount = 0L;
+
     @PrePersist
     public void prePersist() {
 

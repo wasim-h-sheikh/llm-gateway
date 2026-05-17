@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 
 import org.springframework.stereotype.Component;
 
+import java.util.Comparator;
 import java.util.List;
 
 @Component
@@ -29,16 +30,27 @@ public class LatencyBasedRouter {
     public RoutingDecision route() {
 
         List<ModelMetadata> models =
-                repository
-                        .findByEnabledTrueOrderByAvgLatencyMsAsc();
+                repository.findByEnabledTrue();
 
         if (models.isEmpty()) {
+
             throw new RuntimeException(
                     "No enabled models found"
             );
         }
 
-        ModelMetadata selected = models.get(0);
+        ModelMetadata selected =
+                models.stream()
+                        .min(
+                                Comparator.comparingDouble(
+                                        this::calculateScore
+                                )
+                        )
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "No healthy model found"
+                                )
+                        );
 
         return RoutingDecision.builder()
                 .selectedModel(
@@ -48,8 +60,44 @@ public class LatencyBasedRouter {
                         selected.getProvider().name()
                 )
                 .reason(
-                        "Lowest latency routing"
+                        buildReason(selected)
                 )
                 .build();
+    }
+
+    /**
+     * Lower score is better
+     */
+    private double calculateScore(
+            ModelMetadata model
+    ) {
+
+        double latency =
+                safeInt(model.getAvgLatencyMs());
+
+        double healthBonus =
+                safeDouble(model.getHealthScore()) * 5;
+
+        return latency - healthBonus;
+    }
+
+    private String buildReason(
+            ModelMetadata model
+    ) {
+
+        return String.format(
+                "Latency optimized routing " +
+                        "(latency=%sms health=%.2f)",
+                model.getAvgLatencyMs(),
+                model.getHealthScore()
+        );
+    }
+
+    private int safeInt(Integer value) {
+        return value == null ? 999999 : value;
+    }
+
+    private double safeDouble(Double value) {
+        return value == null ? 0 : value;
     }
 }

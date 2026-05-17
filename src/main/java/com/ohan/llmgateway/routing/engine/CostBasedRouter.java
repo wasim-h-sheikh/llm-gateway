@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 
 import org.springframework.stereotype.Component;
 
+import java.util.Comparator;
 import java.util.List;
 
 @Component
@@ -29,16 +30,27 @@ public class CostBasedRouter {
     public RoutingDecision route() {
 
         List<ModelMetadata> models =
-                repository
-                        .findByEnabledTrueOrderByInputCostPer1kAsc();
+                repository.findByEnabledTrue();
 
         if (models.isEmpty()) {
+
             throw new RuntimeException(
                     "No enabled models found"
             );
         }
 
-        ModelMetadata selected = models.get(0);
+        ModelMetadata selected =
+                models.stream()
+                        .min(
+                                Comparator.comparingDouble(
+                                        this::calculateScore
+                                )
+                        )
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "No healthy model found"
+                                )
+                        );
 
         return RoutingDecision.builder()
                 .selectedModel(
@@ -48,8 +60,44 @@ public class CostBasedRouter {
                         selected.getProvider().name()
                 )
                 .reason(
-                        "Lowest cost routing"
+                        buildReason(selected)
                 )
                 .build();
+    }
+
+    /**
+     * Lower score is better
+     */
+    private double calculateScore(
+            ModelMetadata model
+    ) {
+
+        double cost =
+                safeDouble(
+                        model.getInputCostPer1k()
+                ) * 100000;
+
+        double healthBonus =
+                safeDouble(
+                        model.getHealthScore()
+                ) * 5;
+
+        return cost - healthBonus;
+    }
+
+    private String buildReason(
+            ModelMetadata model
+    ) {
+
+        return String.format(
+                "Cost optimized routing " +
+                        "(cost=%.6f health=%.2f)",
+                model.getInputCostPer1k(),
+                model.getHealthScore()
+        );
+    }
+
+    private double safeDouble(Double value) {
+        return value == null ? 0 : value;
     }
 }

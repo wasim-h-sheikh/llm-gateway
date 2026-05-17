@@ -13,6 +13,7 @@
 
 package com.ohan.llmgateway.router;
 
+import com.ohan.llmgateway.health.service.HealthScoreService;
 import com.ohan.llmgateway.model.entity.ModelMetadata;
 import com.ohan.llmgateway.model.service.ModelMetadataService;
 import com.ohan.llmgateway.provider.LlmProvider;
@@ -28,14 +29,15 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class AdvancedModelRouter implements ModelRouter{
+public class AdvancedModelRouter implements ModelRouter {
 
     private final ProviderRegistry providerRegistry;
     private final ResilientProviderExecutor executor;
     private final ModelMetadataService modelMetadataService;
+    private final HealthScoreService healthScoreService;
 
     @Override
-    public  LlmResponse route(
+    public LlmResponse route(
             String model,
             String prompt
     ) {
@@ -48,6 +50,8 @@ public class AdvancedModelRouter implements ModelRouter{
         String providerBeanName =
                 metadata.getProviderBeanName();
 
+        long start = System.currentTimeMillis();
+
         try {
 
             LlmProvider provider =
@@ -55,14 +59,40 @@ public class AdvancedModelRouter implements ModelRouter{
                             providerBeanName
                     );
 
-            return executor.execute(
-                    providerBeanName,
-                    provider,
+            LlmResponse response =
+                    executor.execute(
+                            providerBeanName,
+                            provider,
+                            model,
+                            prompt
+                    );
+
+            long latency =
+                    System.currentTimeMillis() - start;
+
+            healthScoreService.updateHealthScore(
                     model,
-                    prompt
+                    true,
+                    latency,
+                    false
             );
 
+            return response;
+
         } catch (Exception e) {
+
+            long latency =
+                    System.currentTimeMillis() - start;
+
+            boolean timeout =
+                    isTimeoutException(e);
+
+            healthScoreService.updateHealthScore(
+                    model,
+                    false,
+                    latency,
+                    timeout
+            );
 
             log.error(
                     "Provider execution failed. model={} provider={}",
@@ -83,16 +113,35 @@ public class AdvancedModelRouter implements ModelRouter{
     ) {
 
         if (metadata == null) {
+
             throw new RuntimeException(
                     "Model metadata not found"
             );
         }
 
-        if (!Boolean.TRUE.equals(metadata.getEnabled())) {
+        if (!Boolean.TRUE.equals(
+                metadata.getEnabled()
+        )) {
+
             throw new RuntimeException(
                     "Model is disabled: "
                             + metadata.getModelName()
             );
         }
+    }
+
+    private boolean isTimeoutException(
+            Exception e
+    ) {
+
+        if (e.getMessage() == null) {
+            return false;
+        }
+
+        String message =
+                e.getMessage().toLowerCase();
+
+        return message.contains("timeout")
+                || message.contains("timed out");
     }
 }
