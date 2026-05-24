@@ -28,6 +28,10 @@ providers:
       api-key: ${NVIDIA_API_KEY}
       base-url: https://integrate.api.nvidia.com/v1
       enabled: true
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      base-url: https://api.openai.com/v1
+      enabled: true
 
 resilience4j:
   circuitbreaker:

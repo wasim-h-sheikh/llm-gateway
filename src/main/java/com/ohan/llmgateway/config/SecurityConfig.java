@@ -15,6 +15,7 @@ import com.ohan.llmgateway.apikey.security.ApiKeyAuthenticationFilter;
 import com.ohan.llmgateway.auth.jwt.JwtAuthenticationFilter;
 import com.ohan.llmgateway.auth.service.CustomUserDetailsService;
 import com.ohan.llmgateway.ratelimit.RateLimitFilter;
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -50,9 +51,16 @@ public class SecurityConfig {
 
         http
                 .csrf(AbstractHttpConfigurer::disable)
-
+                .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
+                        .dispatcherTypeMatchers(
+                                DispatcherType.ASYNC
+                        ).permitAll()
                         .requestMatchers("/api/auth/**", "/error").permitAll()
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.OPTIONS,
+                                "/**"
+                        ).permitAll()
                         .anyRequest().authenticated()
                 )
 
@@ -85,10 +93,15 @@ public class SecurityConfig {
 
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of("http://localhost:3000"));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
-
+        config.setExposedHeaders(
+                List.of(
+                        "Content-Type",
+                        "Cache-Control"
+                )
+        );
         UrlBasedCorsConfigurationSource source =
                 new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
