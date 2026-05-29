@@ -85,64 +85,37 @@ public class OpenAiStreamingClient
 
         return webClient.post()
 
-                .uri(
-                        config.getBaseUrl()
+                .uri(config.getBaseUrl()
                                 + "/chat/completions"
                 )
-
-                .header(
-                        "Authorization",
+                .header("Authorization",
                         "Bearer "
                                 + config.getApiKey()
                 )
-
-                .contentType(
-                        MediaType.APPLICATION_JSON
-                )
-
-                .accept(
-                        MediaType.TEXT_EVENT_STREAM
-                )
-
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.TEXT_EVENT_STREAM)
                 .bodyValue(body)
-
                 .retrieve()
-
                 .bodyToFlux(String.class)
-
-                // DEBUG
-                .doOnNext(chunk ->
-                        log.info(
-                                "RAW OPENAI CHUNK: {}",
-                                chunk
-                        )
-                )
-
                 .timeout(Duration.ofSeconds(60))
-
                 .flatMap(chunk ->
                         parseChunk(chunk, request)
                 )
-
                 .doOnCancel(() ->
                         log.info(
                                 "OPENAI stream cancelled"
                         )
                 )
-
                 .doOnComplete(() ->
                         log.info(
                                 "OPENAI stream completed"
                         )
                 )
-
                 .onErrorResume(ex -> {
-
                     log.error(
                             "Streaming error",
                             ex
                     );
-
                     return Flux.just(
                             StreamingChunk.builder()
                                     .provider("openai")
