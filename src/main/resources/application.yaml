@@ -36,6 +36,10 @@ providers:
       api-key: ${GEMINI_API_KEY}
       base-url: https://generativelanguage.googleapis.com/v1beta/models
       enabled: true
+    claude:
+      apiKey: ${ANTHROPIC_API_KEY}
+      baseUrl: https://api.anthropic.com/v1/messages
+      enabled: true
 
 resilience4j:
   circuitbreaker:
