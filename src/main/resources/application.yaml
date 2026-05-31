@@ -10,9 +10,17 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: true
+    # Run data.sql AFTER Hibernate creates/updates the schema, so the seed
+    # inserts target tables that already exist.
+    defer-datasource-initialization: true
     properties:
       hibernate:
         format_sql: true
+
+  # Always run schema/data SQL scripts (data.sql), not just for embedded DBs.
+  sql:
+    init:
+      mode: always
 
   redis:
     host: localhost
