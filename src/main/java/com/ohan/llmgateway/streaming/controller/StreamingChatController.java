@@ -10,8 +10,10 @@
 
 package com.ohan.llmgateway.streaming.controller;
 
+import com.ohan.llmgateway.streaming.dto.ParallelStreamRequest;
 import com.ohan.llmgateway.streaming.dto.StreamingChatRequest;
 import com.ohan.llmgateway.streaming.dto.StreamingChunk;
+import com.ohan.llmgateway.streaming.service.ParallelStreamingService;
 import com.ohan.llmgateway.streaming.service.StreamingExecutionService;
 
 import lombok.RequiredArgsConstructor;
@@ -30,6 +32,9 @@ public class StreamingChatController {
     private final StreamingExecutionService
             streamingExecutionService;
 
+    private final ParallelStreamingService
+            parallelStreamingService;
+
     @PostMapping(
             value = "/stream",
             produces = MediaType.TEXT_EVENT_STREAM_VALUE
@@ -39,6 +44,28 @@ public class StreamingChatController {
     ) {
 
         return streamingExecutionService
+                .stream(request)
+
+                .map(chunk ->
+
+                        ServerSentEvent
+                                .<StreamingChunk>builder()
+
+                                .data(chunk)
+
+                                .build()
+                );
+    }
+
+    @PostMapping(
+            value = "/stream/parallel",
+            produces = MediaType.TEXT_EVENT_STREAM_VALUE
+    )
+    public Flux<ServerSentEvent<StreamingChunk>> streamParallel(
+            @RequestBody ParallelStreamRequest request
+    ) {
+
+        return parallelStreamingService
                 .stream(request)
 
                 .map(chunk ->
