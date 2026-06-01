@@ -56,4 +56,36 @@ public class UsageService {
 
         usageLogRepository.save(log);
     }
+
+    /**
+     * Records usage when exact token counts are not available (e.g. streaming
+     * responses, whose chunks carry no usage metadata). Tokens are estimated
+     * from the input and output text. userId/apiKeyId are not yet wired in.
+     */
+    public void recordEstimatedUsage(
+            String provider,
+            String model,
+            String inputText,
+            String outputText
+    ) {
+        recordUsage(
+                null,
+                null,
+                model,
+                provider,
+                estimateTokens(inputText),
+                estimateTokens(outputText)
+        );
+    }
+
+    /**
+     * Rough token estimate (~4 characters per token) used when a provider does
+     * not return exact token counts. Good enough for usage/cost tracking.
+     */
+    private int estimateTokens(String text) {
+        if (text == null || text.isEmpty()) {
+            return 0;
+        }
+        return (int) Math.ceil(text.length() / 4.0);
+    }
 }

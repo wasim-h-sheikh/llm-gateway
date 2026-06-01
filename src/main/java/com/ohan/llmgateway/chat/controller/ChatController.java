@@ -14,8 +14,6 @@ import com.ohan.llmgateway.chat.dto.ChatCompletionRequest;
 import com.ohan.llmgateway.chat.dto.ChatCompletionResponse;
 import com.ohan.llmgateway.execution.service.LlmExecutionService;
 import com.ohan.llmgateway.provider.dto.LlmResponse;
-import com.ohan.llmgateway.router.AdvancedModelRouter;
-import com.ohan.llmgateway.usage.service.UsageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -32,7 +30,6 @@ import java.util.UUID;
 public class ChatController {
 
     private final LlmExecutionService llmExecutionService;
-    private final UsageService usageService;
 
     @PostMapping("/completions")
     public ResponseEntity<ChatCompletionResponse> chatCompletion(
@@ -45,16 +42,6 @@ public class ChatController {
         LlmResponse response = llmExecutionService.execute(
                 request.getModel(),
                 prompt
-        );
-
-        // Save usage (recorded for both fresh and cached responses)
-        usageService.recordUsage(
-                null,
-                null,
-                response.getModel(),
-                response.getProvider(),
-                response.getInputTokens(),
-                response.getOutputTokens()
         );
 
         ChatCompletionResponse chatResponse = buildResponse(

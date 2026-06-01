@@ -43,6 +43,7 @@ public class ParallelStreamingService {
 
     private final List<StreamingProviderClient> providers;
     private final PromptCacheService promptCacheService;
+    private final StreamingUsageRecorder streamingUsageRecorder;
 
     public Flux<StreamingChunk> stream(ParallelStreamRequest request) {
 
@@ -120,49 +121,59 @@ public class ParallelStreamingService {
                 prompt
         );
 
-        // Replay this target's stream from cache if available
+        Flux<StreamingChunk> source;
+
+        // Replay this target's stream from cache if available, otherwise stream live
         Flux<StreamingChunk> cached = promptCacheService.getStream(cacheKey);
         if (cached != null) {
-            return cached;
+            source = cached;
+        } else {
+            StreamingChatRequest single = new StreamingChatRequest();
+            single.setProvider(target.getProvider());
+            single.setModel(target.getModel());
+            single.setPrompt(prompt);
+
+            Flux<StreamingChunk> live = client.stream(single)
+                    .onErrorResume(ex -> {
+
+                        log.error(
+                                "Parallel stream failed for {}:{}",
+                                target.getProvider(),
+                                target.getModel(),
+                                ex
+                        );
+
+                        return Flux.just(
+                                StreamingChunk.builder()
+                                        .provider(target.getProvider())
+                                        .model(target.getModel())
+                                        .error(true)
+                                        .errorMessage(
+                                                ex.getMessage() != null
+                                                        ? ex.getMessage()
+                                                        : "Unknown streaming error"
+                                        )
+                                        .completed(true)
+                                        .build()
+                        );
+                    });
+
+            // Accumulate and cache this target's stream on successful completion
+            // (error chunks from onErrorResume are not cached)
+            source = promptCacheService.cacheStream(
+                    cacheKey,
+                    target.getProvider(),
+                    target.getModel(),
+                    live
+            );
         }
 
-        StreamingChatRequest single = new StreamingChatRequest();
-        single.setProvider(target.getProvider());
-        single.setModel(target.getModel());
-        single.setPrompt(prompt);
-
-        Flux<StreamingChunk> live = client.stream(single)
-                .onErrorResume(ex -> {
-
-                    log.error(
-                            "Parallel stream failed for {}:{}",
-                            target.getProvider(),
-                            target.getModel(),
-                            ex
-                    );
-
-                    return Flux.just(
-                            StreamingChunk.builder()
-                                    .provider(target.getProvider())
-                                    .model(target.getModel())
-                                    .error(true)
-                                    .errorMessage(
-                                            ex.getMessage() != null
-                                                    ? ex.getMessage()
-                                                    : "Unknown streaming error"
-                                    )
-                                    .completed(true)
-                                    .build()
-                    );
-                });
-
-        // Accumulate and cache this target's stream on successful completion
-        // (error chunks from onErrorResume are not cached)
-        return promptCacheService.cacheStream(
-                cacheKey,
+        // Central usage tracking per target (recorded for both fresh and replayed streams)
+        return streamingUsageRecorder.track(
                 target.getProvider(),
                 target.getModel(),
-                live
+                prompt,
+                source
         );
     }
 }

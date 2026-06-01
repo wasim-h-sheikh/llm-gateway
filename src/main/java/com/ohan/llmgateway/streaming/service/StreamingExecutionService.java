@@ -28,6 +28,7 @@ public class StreamingExecutionService {
 
     private final List<StreamingProviderClient> providers;
     private final PromptCacheService promptCacheService;
+    private final StreamingUsageRecorder streamingUsageRecorder;
 
     public Flux<StreamingChunk> stream(StreamingChatRequest request) {
 
@@ -37,33 +38,43 @@ public class StreamingExecutionService {
                 request.getPrompt()
         );
 
-        // Replay a cached stream if available
+        Flux<StreamingChunk> source;
+
+        // Replay a cached stream if available, otherwise stream from the provider
         Flux<StreamingChunk> cached = promptCacheService.getStream(cacheKey);
         if (cached != null) {
-            return cached;
+            source = cached;
+        } else {
+            log.info(
+                    "Prompt cache MISS (stream) - streaming from provider. provider={} model={}",
+                    request.getProvider(),
+                    request.getModel()
+            );
+
+            StreamingProviderClient provider = providers.stream()
+                    .filter(p -> p.supports(request.getProvider()))
+                    .findFirst()
+                    .orElseThrow(() ->
+                            new RuntimeException(
+                                    "Unsupported provider: " + request.getProvider()
+                            )
+                    );
+
+            // Accumulate and cache the stream on successful completion
+            source = promptCacheService.cacheStream(
+                    cacheKey,
+                    request.getProvider(),
+                    request.getModel(),
+                    provider.stream(request)
+            );
         }
 
-        log.info(
-                "Prompt cache MISS (stream) - streaming from provider. provider={} model={}",
-                request.getProvider(),
-                request.getModel()
-        );
-
-        StreamingProviderClient provider = providers.stream()
-                .filter(p -> p.supports(request.getProvider()))
-                .findFirst()
-                .orElseThrow(() ->
-                        new RuntimeException(
-                                "Unsupported provider: " + request.getProvider()
-                        )
-                );
-
-        // Accumulate and cache the stream on successful completion
-        return promptCacheService.cacheStream(
-                cacheKey,
+        // Central usage tracking (recorded for both fresh and replayed streams)
+        return streamingUsageRecorder.track(
                 request.getProvider(),
                 request.getModel(),
-                provider.stream(request)
+                request.getPrompt(),
+                source
         );
     }
 }

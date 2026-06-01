@@ -13,6 +13,7 @@ package com.ohan.llmgateway.execution.service;
 import com.ohan.llmgateway.cache.PromptCacheService;
 import com.ohan.llmgateway.provider.dto.LlmResponse;
 import com.ohan.llmgateway.router.ModelRouter;
+import com.ohan.llmgateway.usage.service.UsageService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,8 +22,8 @@ import org.springframework.stereotype.Service;
 
 /**
  * Central execution path for all non-streaming chat (completions, compare,
- * intelligent routing). Prompt caching lives here so every caller benefits
- * without duplicating cache logic.
+ * intelligent routing). Prompt caching and usage tracking live here so every
+ * caller benefits without duplicating the logic.
  */
 @Service
 @RequiredArgsConstructor
@@ -31,6 +32,7 @@ public class LlmExecutionService {
 
     private final ModelRouter modelRouter;
     private final PromptCacheService promptCacheService;
+    private final UsageService usageService;
 
     public LlmResponse execute(
             String model,
@@ -38,6 +40,8 @@ public class LlmExecutionService {
     ) {
 
         String cacheKey = promptCacheService.completionKey(model, prompt);
+
+        LlmResponse response;
 
         // Check the central prompt cache before hitting the provider
         LlmResponse cached = promptCacheService.get(cacheKey, LlmResponse.class);
@@ -47,24 +51,42 @@ public class LlmExecutionService {
                     cached.getModel(),
                     cached.getProvider()
             );
-            return cached;
+            response = cached;
+        } else {
+            log.info(
+                    "Prompt cache MISS - executing model request. model={}",
+                    model
+            );
+
+            response = modelRouter.route(
+                    model,
+                    prompt
+            );
+
+            // Store the full response (content + provider/token metadata) for reuse
+            promptCacheService.put(cacheKey, response);
+            log.info(
+                    "Prompt cache STORE - cached response. model={}",
+                    response.getModel()
+            );
         }
 
-        log.info(
-                "Prompt cache MISS - executing model request. model={}",
-                model
+        // Central usage tracking for every non-streaming chat path
+        // (recorded for both fresh and cached responses)
+        usageService.recordUsage(
+                null,
+                null,
+                response.getModel(),
+                response.getProvider(),
+                response.getInputTokens(),
+                response.getOutputTokens()
         );
-
-        LlmResponse response = modelRouter.route(
-                model,
-                prompt
-        );
-
-        // Store the full response (content + provider/token metadata) for reuse
-        promptCacheService.put(cacheKey, response);
         log.info(
-                "Prompt cache STORE - cached response. model={}",
-                response.getModel()
+                "Usage recorded. model={} provider={} inputTokens={} outputTokens={}",
+                response.getModel(),
+                response.getProvider(),
+                response.getInputTokens(),
+                response.getOutputTokens()
         );
 
         return response;
