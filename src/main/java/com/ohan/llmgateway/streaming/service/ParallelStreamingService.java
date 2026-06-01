@@ -10,6 +10,7 @@
 
 package com.ohan.llmgateway.streaming.service;
 
+import com.ohan.llmgateway.cache.PromptCacheService;
 import com.ohan.llmgateway.streaming.dto.ParallelStreamRequest;
 import com.ohan.llmgateway.streaming.dto.StreamingChatRequest;
 import com.ohan.llmgateway.streaming.dto.StreamingChunk;
@@ -41,6 +42,7 @@ import java.util.List;
 public class ParallelStreamingService {
 
     private final List<StreamingProviderClient> providers;
+    private final PromptCacheService promptCacheService;
 
     public Flux<StreamingChunk> stream(ParallelStreamRequest request) {
 
@@ -112,12 +114,24 @@ public class ParallelStreamingService {
             );
         }
 
+        String cacheKey = promptCacheService.streamKey(
+                target.getProvider(),
+                target.getModel(),
+                prompt
+        );
+
+        // Replay this target's stream from cache if available
+        Flux<StreamingChunk> cached = promptCacheService.getStream(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+
         StreamingChatRequest single = new StreamingChatRequest();
         single.setProvider(target.getProvider());
         single.setModel(target.getModel());
         single.setPrompt(prompt);
 
-        return client.stream(single)
+        Flux<StreamingChunk> live = client.stream(single)
                 .onErrorResume(ex -> {
 
                     log.error(
@@ -141,5 +155,14 @@ public class ParallelStreamingService {
                                     .build()
                     );
                 });
+
+        // Accumulate and cache this target's stream on successful completion
+        // (error chunks from onErrorResume are not cached)
+        return promptCacheService.cacheStream(
+                cacheKey,
+                target.getProvider(),
+                target.getModel(),
+                live
+        );
     }
 }

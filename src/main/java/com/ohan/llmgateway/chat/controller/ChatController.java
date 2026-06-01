@@ -10,7 +10,6 @@
 
 package com.ohan.llmgateway.chat.controller;
 
-import com.ohan.llmgateway.cache.PromptCacheService;
 import com.ohan.llmgateway.chat.dto.ChatCompletionRequest;
 import com.ohan.llmgateway.chat.dto.ChatCompletionResponse;
 import com.ohan.llmgateway.execution.service.LlmExecutionService;
@@ -34,7 +33,6 @@ public class ChatController {
 
     private final LlmExecutionService llmExecutionService;
     private final UsageService usageService;
-    private final PromptCacheService promptCacheService;
 
     @PostMapping("/completions")
     public ResponseEntity<ChatCompletionResponse> chatCompletion(
@@ -44,28 +42,10 @@ public class ChatController {
         String prompt = buildPrompt(request);
         log.info("ChatController:chatCompletion");
 
-        LlmResponse response;
-
-        // Check prompt cache before hitting the LLM
-        LlmResponse cached = promptCacheService.get(prompt, LlmResponse.class);
-        if (cached != null) {
-            log.info(
-                    "Prompt cache HIT - returning cached response. model={} provider={}",
-                    cached.getModel(),
-                    cached.getProvider()
-            );
-            response = cached;
-        } else {
-            log.info("Prompt cache MISS - executing model request. model={}", request.getModel());
-            response = llmExecutionService.execute(
-                    request.getModel(),
-                    prompt
-            );
-
-            // Store the full response (content + provider/token metadata) for subsequent identical prompts
-            promptCacheService.put(prompt, response);
-            log.info("Prompt cache STORE - cached response for prompt. model={}", response.getModel());
-        }
+        LlmResponse response = llmExecutionService.execute(
+                request.getModel(),
+                prompt
+        );
 
         // Save usage (recorded for both fresh and cached responses)
         usageService.recordUsage(
