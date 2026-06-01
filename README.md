@@ -1,7 +1,7 @@
 # LLM Gateway
-🎥 Full Demo Video:
+## 🎥 Demo
 
-https://youtu.be/ry3fzab1nA0
+👉 https://www.youtube.com/watch?v=ry3fzab1nA0
 
 A scalable, multi-provider **LLM Gateway** that presents a single, unified API in front of OpenAI, Google Gemini, Anthropic Claude, and NVIDIA-hosted models. The gateway adds **intelligent routing**, **cost optimization**, **prompt caching**, **circuit-breaker resilience**, **usage & cost accounting**, and **authentication / rate limiting** on top of the underlying providers — the same architectural role an API gateway plays for microservices, applied to Large Language Models.
 
