@@ -11,6 +11,7 @@
 package com.ohan.llmgateway.streaming.service;
 
 import com.ohan.llmgateway.cache.PromptCacheService;
+import com.ohan.llmgateway.security.CurrentUserProvider;
 import com.ohan.llmgateway.streaming.dto.ParallelStreamRequest;
 import com.ohan.llmgateway.streaming.dto.StreamingChatRequest;
 import com.ohan.llmgateway.streaming.dto.StreamingChunk;
@@ -44,6 +45,7 @@ public class ParallelStreamingService {
     private final List<StreamingProviderClient> providers;
     private final PromptCacheService promptCacheService;
     private final StreamingUsageRecorder streamingUsageRecorder;
+    private final CurrentUserProvider currentUserProvider;
 
     public Flux<StreamingChunk> stream(ParallelStreamRequest request) {
 
@@ -67,13 +69,19 @@ public class ParallelStreamingService {
             );
         }
 
+        // Capture identity now (request thread) for usage attribution on completion
+        Long userId = currentUserProvider.currentUserId();
+        Long apiKeyId = currentUserProvider.currentApiKeyId();
+
         List<Flux<StreamingChunk>> streams =
                 request.getTargets()
                         .stream()
                         .map(target ->
                                 streamTarget(
                                         target,
-                                        request.getPrompt()
+                                        request.getPrompt(),
+                                        userId,
+                                        apiKeyId
                                 )
                         )
                         .toList();
@@ -83,7 +91,9 @@ public class ParallelStreamingService {
 
     private Flux<StreamingChunk> streamTarget(
             ParallelStreamRequest.ModelTarget target,
-            String prompt
+            String prompt,
+            Long userId,
+            Long apiKeyId
     ) {
 
         StreamingProviderClient client =
@@ -170,6 +180,8 @@ public class ParallelStreamingService {
 
         // Central usage tracking per target (recorded for both fresh and replayed streams)
         return streamingUsageRecorder.track(
+                userId,
+                apiKeyId,
                 target.getProvider(),
                 target.getModel(),
                 prompt,

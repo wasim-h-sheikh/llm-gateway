@@ -13,6 +13,7 @@ package com.ohan.llmgateway.apikey.security;
 import com.ohan.llmgateway.apikey.repository.ApiKeyRepository;
 import com.ohan.llmgateway.security.AuthTokenResolver;
 import com.ohan.llmgateway.security.AuthTokenType;
+import com.ohan.llmgateway.security.AuthenticatedPrincipal;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import lombok.RequiredArgsConstructor;
@@ -64,8 +65,14 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 
                     var user = storedKey.getUser();
 
+                    var principal = AuthenticatedPrincipal.builder()
+                            .userId(user.getId())
+                            .email(user.getEmail())
+                            .apiKeyId(storedKey.getId())
+                            .build();
+
                     var auth = new UsernamePasswordAuthenticationToken(
-                            user.getEmail(),
+                            principal,
                             null,
                             null
                     );

@@ -22,6 +22,8 @@ import com.ohan.llmgateway.router.AdvancedModelRouter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -41,15 +43,26 @@ public class MultiModelCompareService {
 
         String prompt = extractPrompt(request);
 
+        // Capture the security context on the request thread so usage recorded
+        // on the async worker threads is still attributed to the caller.
+        SecurityContext securityContext = SecurityContextHolder.getContext();
+
         List<CompletableFuture<ModelComparisonResult>> futures =
                 request.getModels()
                         .stream()
                         .map(model ->
                                 CompletableFuture.supplyAsync(
-                                        () -> executeModel(
-                                                model,
-                                                prompt
-                                        )
+                                        () -> {
+                                            SecurityContextHolder.setContext(securityContext);
+                                            try {
+                                                return executeModel(
+                                                        model,
+                                                        prompt
+                                                );
+                                            } finally {
+                                                SecurityContextHolder.clearContext();
+                                            }
+                                        }
                                 )
                         )
                         .toList();

@@ -10,9 +10,12 @@
 
 package com.ohan.llmgateway.auth.jwt;
 
+import com.ohan.llmgateway.auth.entity.User;
+import com.ohan.llmgateway.auth.repository.UserRepository;
 import com.ohan.llmgateway.common.error.ErrorCode;
 import com.ohan.llmgateway.security.AuthTokenResolver;
 import com.ohan.llmgateway.security.AuthTokenType;
+import com.ohan.llmgateway.security.AuthenticatedPrincipal;
 import com.ohan.llmgateway.security.SecurityErrorResponseWriter;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.*;
@@ -36,6 +39,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
+    private final UserRepository userRepository;
     private final AuthTokenResolver authTokenResolver;
     private final SecurityErrorResponseWriter securityErrorResponseWriter;
 
@@ -85,8 +89,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             var userDetails = userDetailsService.loadUserByUsername(username);
 
+            Long userId = userRepository.findByEmail(username)
+                    .map(User::getId)
+                    .orElse(null);
+
+            var principal = AuthenticatedPrincipal.builder()
+                    .userId(userId)
+                    .email(username)
+                    .apiKeyId(null)
+                    .build();
+
             var authToken = new UsernamePasswordAuthenticationToken(
-                    userDetails,
+                    principal,
                     null,
                     userDetails.getAuthorities()
             );

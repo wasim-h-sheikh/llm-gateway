@@ -13,6 +13,8 @@ package com.ohan.llmgateway.execution.service;
 import com.ohan.llmgateway.cache.PromptCacheService;
 import com.ohan.llmgateway.provider.dto.LlmResponse;
 import com.ohan.llmgateway.router.ModelRouter;
+import com.ohan.llmgateway.security.CurrentUserProvider;
+import com.ohan.llmgateway.usage.dto.UsageContext;
 import com.ohan.llmgateway.usage.service.UsageService;
 
 import lombok.RequiredArgsConstructor;
@@ -33,6 +35,7 @@ public class LlmExecutionService {
     private final ModelRouter modelRouter;
     private final PromptCacheService promptCacheService;
     private final UsageService usageService;
+    private final CurrentUserProvider currentUserProvider;
 
     public LlmResponse execute(
             String model,
@@ -72,14 +75,17 @@ public class LlmExecutionService {
         }
 
         // Central usage tracking for every non-streaming chat path
-        // (recorded for both fresh and cached responses)
+        // (recorded for both fresh and cached responses). Identity is read here
+        // on the request thread, where the SecurityContext is available.
         usageService.recordUsage(
-                null,
-                null,
-                response.getModel(),
-                response.getProvider(),
-                response.getInputTokens(),
-                response.getOutputTokens()
+                UsageContext.builder()
+                        .userId(currentUserProvider.currentUserId())
+                        .apiKeyId(currentUserProvider.currentApiKeyId())
+                        .provider(response.getProvider())
+                        .model(response.getModel())
+                        .inputTokens(response.getInputTokens())
+                        .outputTokens(response.getOutputTokens())
+                        .build()
         );
         log.info(
                 "Usage recorded. model={} provider={} inputTokens={} outputTokens={}",

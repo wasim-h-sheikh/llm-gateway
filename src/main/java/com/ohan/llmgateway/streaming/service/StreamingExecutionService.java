@@ -11,6 +11,7 @@
 package com.ohan.llmgateway.streaming.service;
 
 import com.ohan.llmgateway.cache.PromptCacheService;
+import com.ohan.llmgateway.security.CurrentUserProvider;
 import com.ohan.llmgateway.streaming.dto.StreamingChatRequest;
 import com.ohan.llmgateway.streaming.dto.StreamingChunk;
 import com.ohan.llmgateway.streaming.provider.StreamingProviderClient;
@@ -29,8 +30,13 @@ public class StreamingExecutionService {
     private final List<StreamingProviderClient> providers;
     private final PromptCacheService promptCacheService;
     private final StreamingUsageRecorder streamingUsageRecorder;
+    private final CurrentUserProvider currentUserProvider;
 
     public Flux<StreamingChunk> stream(StreamingChatRequest request) {
+
+        // Capture identity now (request thread) for usage attribution on completion
+        Long userId = currentUserProvider.currentUserId();
+        Long apiKeyId = currentUserProvider.currentApiKeyId();
 
         String cacheKey = promptCacheService.streamKey(
                 request.getProvider(),
@@ -71,6 +77,8 @@ public class StreamingExecutionService {
 
         // Central usage tracking (recorded for both fresh and replayed streams)
         return streamingUsageRecorder.track(
+                userId,
+                apiKeyId,
                 request.getProvider(),
                 request.getModel(),
                 request.getPrompt(),

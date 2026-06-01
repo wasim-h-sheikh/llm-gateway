@@ -10,6 +10,7 @@
 
 package com.ohan.llmgateway.usage.service;
 
+import com.ohan.llmgateway.usage.dto.UsageContext;
 import com.ohan.llmgateway.usage.entity.UsageLog;
 import com.ohan.llmgateway.usage.repository.UsageLogRepository;
 import org.springframework.stereotype.Service;
@@ -28,64 +29,37 @@ public class UsageService {
         this.costCalculator = costCalculator;
     }
 
-    public void recordUsage(
-            Long userId,
-            Long apiKeyId,
-            String model,
-            String provider,
-            int inputTokens,
-            int outputTokens
-    ) {
+    /**
+     * Records a usage event from a {@link UsageContext}. Token counts and
+     * provider/model come from the caller; cost is derived; requestId is
+     * generated when not supplied.
+     */
+    public void recordUsage(UsageContext context) {
+
+        int inputTokens = context.getInputTokens();
+        int outputTokens = context.getOutputTokens();
 
         UsageLog log = new UsageLog();
 
-        log.setUserId(userId);
-        log.setApiKeyId(apiKeyId);
-        log.setModel(model);
-        log.setProvider(provider);
+        log.setUserId(context.getUserId());
+        log.setApiKeyId(context.getApiKeyId());
+        log.setModel(context.getModel());
+        log.setProvider(context.getProvider());
 
         log.setInputTokens(inputTokens);
         log.setOutputTokens(outputTokens);
         log.setTotalTokens(inputTokens + outputTokens);
 
         log.setCostUsd(
-                costCalculator.calculate(model, inputTokens, outputTokens)
+                costCalculator.calculate(context.getModel(), inputTokens, outputTokens)
         );
 
-        log.setRequestId(UUID.randomUUID().toString());
+        log.setRequestId(
+                context.getRequestId() != null
+                        ? context.getRequestId()
+                        : UUID.randomUUID().toString()
+        );
 
         usageLogRepository.save(log);
-    }
-
-    /**
-     * Records usage when exact token counts are not available (e.g. streaming
-     * responses, whose chunks carry no usage metadata). Tokens are estimated
-     * from the input and output text. userId/apiKeyId are not yet wired in.
-     */
-    public void recordEstimatedUsage(
-            String provider,
-            String model,
-            String inputText,
-            String outputText
-    ) {
-        recordUsage(
-                null,
-                null,
-                model,
-                provider,
-                estimateTokens(inputText),
-                estimateTokens(outputText)
-        );
-    }
-
-    /**
-     * Rough token estimate (~4 characters per token) used when a provider does
-     * not return exact token counts. Good enough for usage/cost tracking.
-     */
-    private int estimateTokens(String text) {
-        if (text == null || text.isEmpty()) {
-            return 0;
-        }
-        return (int) Math.ceil(text.length() / 4.0);
     }
 }
