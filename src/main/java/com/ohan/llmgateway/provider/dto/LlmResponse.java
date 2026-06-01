@@ -23,6 +23,9 @@ import lombok.Setter;
 @Builder
 public class LlmResponse {
 
+    /** Provider value used for resilience fallbacks (not a real provider call). */
+    public static final String FALLBACK_PROVIDER = "fallback";
+
     private String content;
 
     private int inputTokens;
@@ -32,4 +35,9 @@ public class LlmResponse {
     private String provider;
 
     private String model;
+
+    /** True when this is a resilience fallback rather than a real provider response. */
+    public boolean isFallback() {
+        return FALLBACK_PROVIDER.equals(provider);
+    }
 }

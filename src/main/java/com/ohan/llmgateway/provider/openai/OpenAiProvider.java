@@ -86,7 +86,7 @@ public class OpenAiProvider implements LlmProvider {
                 .content("OpenAI temporarily unavailable. Please try again.")
                 .inputTokens(0)
                 .outputTokens(0)
-                .provider("fallback")
+                .provider(LlmResponse.FALLBACK_PROVIDER)
                 .model(model)
                 .build();
     }

@@ -50,7 +50,7 @@ public class ResilientProviderExecutor {
                 .content("Provider temporarily unavailable")
                 .inputTokens(0)
                 .outputTokens(0)
-                .provider("fallback")
+                .provider(LlmResponse.FALLBACK_PROVIDER)
                 .model(model)
                 .build();
     }

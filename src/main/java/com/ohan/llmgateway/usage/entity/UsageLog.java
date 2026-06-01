@@ -49,7 +49,7 @@ public class UsageLog {
     @Column(name = "total_tokens")
     private Integer totalTokens;
 
-    @Column(name = "cost_usd")
+    @Column(name = "cost_usd", precision = 12, scale = 6)
     private BigDecimal costUsd;
 
     @Column(name = "request_id")

@@ -66,6 +66,16 @@ public class LlmExecutionService {
                     prompt
             );
 
+            // Don't cache resilience fallbacks - they are not real responses and
+            // would otherwise be served from cache for the whole TTL.
+            if (response.isFallback()) {
+                log.warn(
+                        "Fallback response - not caching or recording usage. model={}",
+                        model
+                );
+                return response;
+            }
+
             // Store the full response (content + provider/token metadata) for reuse
             promptCacheService.put(cacheKey, response);
             log.info(
@@ -75,8 +85,9 @@ public class LlmExecutionService {
         }
 
         // Central usage tracking for every non-streaming chat path
-        // (recorded for both fresh and cached responses). Identity is read here
-        // on the request thread, where the SecurityContext is available.
+        // (recorded for both fresh and cached responses, but never for fallbacks).
+        // Identity is read here on the request thread, where the SecurityContext
+        // is available.
         usageService.recordUsage(
                 UsageContext.builder()
                         .userId(currentUserProvider.currentUserId())

@@ -133,7 +133,7 @@ public class ClaudeProvider implements LlmProvider {
                 .content("Claude temporarily unavailable. Please try again.")
                 .inputTokens(0)
                 .outputTokens(0)
-                .provider("fallback")
+                .provider(LlmResponse.FALLBACK_PROVIDER)
                 .model(model)
                 .build();
     }
