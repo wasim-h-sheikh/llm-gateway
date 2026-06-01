@@ -10,6 +10,7 @@
 
 package com.ohan.llmgateway.chat.controller;
 
+import com.ohan.llmgateway.cache.PromptCacheService;
 import com.ohan.llmgateway.chat.dto.ChatCompletionRequest;
 import com.ohan.llmgateway.chat.dto.ChatCompletionResponse;
 import com.ohan.llmgateway.execution.service.LlmExecutionService;
@@ -33,6 +34,7 @@ public class ChatController {
 
     private final LlmExecutionService llmExecutionService;
     private final UsageService usageService;
+    private final PromptCacheService promptCacheService;
 
     @PostMapping("/completions")
     public ResponseEntity<ChatCompletionResponse> chatCompletion(
@@ -41,12 +43,31 @@ public class ChatController {
 
         String prompt = buildPrompt(request);
         log.info("ChatController:chatCompletion");
-        LlmResponse response = llmExecutionService.execute(
-                request.getModel(),
-                prompt
-        );
 
-        // Save usage
+        LlmResponse response;
+
+        // Check prompt cache before hitting the LLM
+        LlmResponse cached = promptCacheService.get(prompt, LlmResponse.class);
+        if (cached != null) {
+            log.info(
+                    "Prompt cache HIT - returning cached response. model={} provider={}",
+                    cached.getModel(),
+                    cached.getProvider()
+            );
+            response = cached;
+        } else {
+            log.info("Prompt cache MISS - executing model request. model={}", request.getModel());
+            response = llmExecutionService.execute(
+                    request.getModel(),
+                    prompt
+            );
+
+            // Store the full response (content + provider/token metadata) for subsequent identical prompts
+            promptCacheService.put(prompt, response);
+            log.info("Prompt cache STORE - cached response for prompt. model={}", response.getModel());
+        }
+
+        // Save usage (recorded for both fresh and cached responses)
         usageService.recordUsage(
                 null,
                 null,
@@ -56,11 +77,20 @@ public class ChatController {
                 response.getOutputTokens()
         );
 
-        ChatCompletionResponse chatResponse = ChatCompletionResponse.builder()
+        ChatCompletionResponse chatResponse = buildResponse(
+                response.getModel(),
+                response.getContent()
+        );
+
+        return ResponseEntity.ok(chatResponse);
+    }
+
+    private ChatCompletionResponse buildResponse(String model, String content) {
+        return ChatCompletionResponse.builder()
                 .id("chatcmpl-" + UUID.randomUUID())
                 .object("chat.completion")
                 .created(Instant.now().getEpochSecond())
-                .model(response.getModel())
+                .model(model)
                 .choices(List.of(
                         ChatCompletionResponse.Choice.builder()
                                 .index(0)
@@ -68,14 +98,12 @@ public class ChatController {
                                 .message(
                                         ChatCompletionResponse.Message.builder()
                                                 .role("assistant")
-                                                .content(response.getContent())
+                                                .content(content)
                                                 .build()
                                 )
                                 .build()
                 ))
                 .build();
-
-        return ResponseEntity.ok(chatResponse);
     }
 
     private String buildPrompt(ChatCompletionRequest request) {
